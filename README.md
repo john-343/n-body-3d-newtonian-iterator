@@ -1,6 +1,7 @@
 # n-body-3d-newtonian-iterator
-
 A real-time interactive **N-body gravitational simulation** implemented in JavaScript using Three.js and Newtonian mechanics.
+
+I made this iterator back around 2018 under the guidance of Dr. Taicheng Ouyang, who had asked me to create a html/js version of a previously existing java iterator. Though I was able to directly translate some features into javascript, I ended up needing to write many parts from scratch to attain the same features as the java version. I decided to finally get my code public again after many years, hence the outdated three.js version. 
 
 ---
 
