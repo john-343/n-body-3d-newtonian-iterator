@@ -65,7 +65,7 @@ var PL= [];
         renderer.setSize(window.innerWidth, window.innerHeight);
         
         var camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 3000);
-        camera.position.set(0,0,100); //already initialized
+        camera.position.set(0,0,300); //already initialized
         
         var scene = new THREE.Scene();
         
@@ -75,6 +75,7 @@ var PL= [];
         var light1 = new THREE.PointLight(0xffffff, 0.5);
         light1.position.set(0,0,100);
         scene.add(light1);
+
 
     
 class Vec
@@ -114,7 +115,7 @@ p2 = new Planet;
 p3 = new Planet;
 */
 //camera position vector
-C = new Vec(0, 0, 100);
+C = new Vec(0, 0, 300);
 
 
 
@@ -224,7 +225,18 @@ var np = 0;
         { 
             //create planet
             Planets.push(new Planet(InitsArray[7 * i + 2], InitsArray[7 * i + 3], InitsArray[7 * i + 4], InitsArray[7 * i + 5], InitsArray[7 * i + 6], InitsArray[7 * i + 7], InitsArray[7 * i + 8], InitsArray[7 * i + 8]));
+			/*var base = 2 + 8 * i;
 
+			Planets.push(new Planet(
+				InitsArray[base + 0], // px
+				InitsArray[base + 1], // py
+				InitsArray[base + 2], // pz
+				InitsArray[base + 3], // vx
+				InitsArray[base + 4], // vy
+				InitsArray[base + 5], // vz
+				InitsArray[base + 6], // r
+			InitsArray[base + 7]  // m
+			*/
             //smaller radii; adjusting for input variety
            Planets[i].r /= 3;
            
@@ -452,6 +464,9 @@ CM = new Vec;
     var theta = 0;
     var phi = 0;
     var r  = -100;
+	r = 800;
+	theta = 0;
+	//phi = Math.PI / 2;
             document.addEventListener('keydown', keyDownHandler, false);
             document.addEventListener('keyup', keyUpHandler, false);
             var dx = 0;
@@ -493,8 +508,8 @@ CM = new Vec;
             function ResetCamera()
             {
                 //reset Camera
-                camera.position.set(CM.x, CM.y, CM.z + 100);
-                light1.position.set(CM.x, CM.y, CM.z + 100);
+                camera.position.set(CM.x, CM.y, CM.z + 300);
+                light1.position.set(CM.x, CM.y, CM.z + 300);
                 theta = 0;
                 phi = 0;
                 
@@ -540,7 +555,15 @@ CM = new Vec;
             var PPlanets = [];
   
          requestAnimationFrame(render);
-       
+
+var defaultInits =
+"0.01 100 " +
+"5.8166 0 0 0.0001 0.3803 0.0000 10.0000 " +
+"-9.5168 0.0008 -0.1376 0.1547 -0.8752 0.2103 5.0000 " +
+"-10.5825 -0.0041 0.6879 -0.7740 0.5729 -1.0517 1.0000";
+SetInitialConditions(defaultInits);       
+
+
         function render() {
            
 if(!pause)
@@ -670,7 +693,7 @@ if(!pause)
            //console.log(i);
            
            //camera stuff
-           if(upPressed) 
+           if(downPressed) 
             {
                 //C.z -= 10;
                 //dz -= 10;
@@ -680,7 +703,7 @@ if(!pause)
                     dz -= 10;
                 }
             }
-            if(downPressed)
+            if(upPressed)
             {
                // C.z += 10;
                 //dz += 10;
@@ -691,11 +714,11 @@ if(!pause)
                 }
             }
             //change speed
-            if(rightPressed)
+            if(leftPressed)
             {
                 dt+= .001;
             }
-            if(leftPressed)
+            if(rightPressed)
             {
                 dt-= .001;
             }
@@ -707,7 +730,7 @@ if(!pause)
                 {
                     C.x = Planets[centerBody].pos.x + dx;
                     C.y = Planets[centerBody].pos.y + dy;
-                    C.z = Planets[centerBody].pos.z + 100 + dz;// + dz;
+                    C.z = Planets[centerBody].pos.z + 300 + dz;// + dz;
                 }
                 
                 
@@ -786,7 +809,11 @@ if(!pause)
                 C.x = r * Math.cos(theta) * Math.sin(phi);
                 C.y = r * Math.sin(phi) * Math.sin(theta);
                 C.z = r * Math.cos(phi);
-                
+/*
+				C.x = r * Math.sin(phi) * Math.cos(theta);
+				C.y = r * Math.cos(phi);
+				C.z = r * Math.sin(phi) * Math.sin(theta);
+                */
                 
                 
                 
@@ -822,7 +849,7 @@ if(!pause)
                     {
                         C.x = CM.x;
                         C.y = CM.y;
-                        C.z = CM.z + dz + 100;
+                        C.z = CM.z + dz + 300;
                     }
                     
                }
@@ -842,12 +869,13 @@ if(!pause)
                 PL[i].geometry.verticesNeedUpdate = true;
             }
             
-            if(frameCounter < 4)
+            /*if(frameCounter < 4)
             {
                 C.x = CM.x;
                 C.y = CM.y;
-                C.z = CM.z + dz + 100;
+                C.z = CM.z + dz + 300;
             }
+*/
             //Planets tail:
             
             
