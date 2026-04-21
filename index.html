@@ -1,0 +1,869 @@
+<html>
+<head>
+        <title>n-body-3d-newtonian-iterator</title>
+        
+        <style>
+            body{
+                margin: 0;
+                overflow: hidden;
+            }
+            
+            canvas{
+                background: green;
+            }
+        </style>
+</head>
+
+ 
+    
+   Initial data field: 
+   <textarea id="inits"></textarea>
+   
+   <!--
+   <input type="text" name="inits" id="inits">
+   !-->
+    <button onclick="SetInitialConditions(document.getElementById('inits').value)">Apply Initial Conditions</button> 
+   <!-- <button onclick="CMF()">Camera follow CM</button> !-->
+    <button onclick="Pause()">Start/Pause</button>
+    <button onclick="ChangeFocus()">Change Focus</button>
+    <button onclick="ResetCamera()">Reset Camera</button>
+    <button onclick="Save()">Save</button>
+    
+    <br>
+    
+    Frame:(bugged) <input type="text" id="text">
+    Controls: up arrow key: zoom in; down arroy key: zoom out; left arrow key: slow down; right arrow key: speed up;
+    <br>
+    Camera Controls: "w", "a", "s", "d" to move camera
+    <canvas id="myCanvas"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r110/three.min.js"></script>
+    
+    
+<script>
+
+//ideas: add reverse time feature
+var frameCounter = "0";
+var MAX_LINE_POINTS = 100000;
+
+var PLM;
+var PG = [];
+var PL= [];
+
+ var colorRed = 0xFF0000;
+    var colorBlue = 0x0000FF;
+    var colorGreen = 0x00FF00;
+    var colorYellow = 0xFFFF00;
+    var colorPurple = 0xFF00FF;
+    var colorSkyBlue = 0x00FFFF;
+
+
+
+//---[--------------------------------------------]
+        var renderer = new THREE.WebGLRenderer({canvas: document.getElementById('myCanvas'), antialias: true});
+        renderer.setClearColor(0x888888);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        
+        var camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 3000);
+        camera.position.set(0,0,100); //already initialized
+        
+        var scene = new THREE.Scene();
+        
+        var light = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(light);
+        
+        var light1 = new THREE.PointLight(0xffffff, 0.5);
+        light1.position.set(0,0,100);
+        scene.add(light1);
+
+    
+class Vec
+{
+    constructor(x = 0,y = 0,z = 0) 
+    {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+}
+/*
+function diff(a, b)
+{
+    var c = new Vec;
+    c.x = a.x - b.x;
+    c.y = a.y - b.y;
+    c.z = a.z - b.z;
+    return c;
+}
+*/
+
+class Planet
+{
+    constructor(px=0, py=0, pz=0, vx=0, vy=0, vz=0, r=0, m=0,)
+    {
+        this.pos = new Vec(px, py, pz);
+        this.vel = new Vec(vx, vy, vz);
+        this.r = r;
+        this.m = m;
+    }
+}
+
+/* 
+p1 = new Planet;
+p2 = new Planet;
+p3 = new Planet;
+*/
+//camera position vector
+C = new Vec(0, 0, 100);
+
+
+
+var Planets = [];
+var Geometries = [];
+var Materials = [];
+var Meshs = [];
+var Spheres = [];
+
+ 
+var dt = .01;
+var i = 0;
+var G = 10000;
+var np = 0;
+
+//hard-coded inits below *trying to get rid of these)
+
+
+//---------------------------------------------------
+
+
+
+//------------------
+    //get inits to script
+    
+    //declare array
+    var InitsArray = [];
+    //var test = ['a', 'b'];
+    function ParseInits(longstring)
+    {
+        longstring = longstring.replace(/(\r\n\t|\n|\r\t)/gm," "); // replacing all 'enters' with spaces 
+        var spaceCount = (longstring.split(" ").length - 1);
+            //reading in ints; pushing to initsArray
+            for(var i = 0; i <= spaceCount; i++)
+            {
+                var noSpace = true;
+                for(var j = 0; j < longstring.length; j++)
+                {
+                    if(longstring.charAt(j) == ' ')
+                    {
+                        noSpace = false;
+                    }
+                }
+                if(!noSpace)
+                {
+                        var copy = longstring;
+                        var newInit = copy.slice(0, copy.indexOf(" "));
+                        InitsArray.push(parseFloat(newInit, 10));
+                        longstring = longstring.slice(longstring.indexOf(" ") + 1, longstring.length);
+                }
+                if(noSpace)
+                {
+                    InitsArray.push(parseFloat(longstring,10));
+                }
+                //console.log(InitsArray);
+            }
+    }
+    
+    //functions
+    //camera on CM
+    var cmf = 0;
+    function CMF()
+    {
+        cmf ++;
+    }
+    //Planets tail
+            var PTGeo = [];
+            var PTline = [];
+            var PTlineMaterial = [];
+            
+           
+    function SetInitialConditions(inits) 
+    {
+        //wipe previous conditions
+        if(np > 0)
+        {
+            for(var i = 0; i < np; i++)
+            {
+                //removeEntity(Spheres[i]);
+                scene.remove(Spheres[i]);
+            }
+            
+        }
+        Planets = [];
+        Geometries = [];
+        Materials = [];
+        Meshs = [];
+        Spheres = [];
+        InitsArray = [];
+        
+        
+        
+         //parse inits
+         ParseInits(inits);
+         //check correct input
+         if( InitsArray.length % 7 != 2)
+         {
+             alert("Incorrect input: incorrect amount of values; check for whitespace errors");
+         }
+         //put values into allocated vectors / variables
+         dt = InitsArray[0];
+         G = InitsArray[1];
+         np = (InitsArray.length - 2) / 7; // each planet has 7 initial conditions
+    // create planets
+   
+        for (var i = 0; i < np; i++) 
+        { 
+            //create planet
+            Planets.push(new Planet(InitsArray[7 * i + 2], InitsArray[7 * i + 3], InitsArray[7 * i + 4], InitsArray[7 * i + 5], InitsArray[7 * i + 6], InitsArray[7 * i + 7], InitsArray[7 * i + 8], InitsArray[7 * i + 8]));
+
+            //smaller radii; adjusting for input variety
+           Planets[i].r /= 3;
+           
+           Planets[i].pos.x *= 10;
+           Planets[i].pos.y *= 10;
+           Planets[i].pos.z *= 10;
+           Planets[i].vel.x *= 10;
+           Planets[i].vel.y *= 10;
+           Planets[i].vel.z *= 10;
+           Planets[i].m *= 10;
+           
+           
+           
+           
+           
+            //render planets
+            Geometries.push(new THREE.SphereGeometry(Planets[i].r, 10, 10));
+            if(i == 0%6)
+            {
+                Materials.push(new THREE.MeshLambertMaterial({color: colorRed}));
+            }
+            if(i == 1%6)
+            {
+                Materials.push(new THREE.MeshLambertMaterial({color: colorBlue}));
+            }
+            if(i == 2%6)
+            {
+                Materials.push(new THREE.MeshLambertMaterial({color: colorGreen}));
+            }
+            if(i == 3%6)
+            {
+                Materials.push(new THREE.MeshLambertMaterial({color: colorYellow}));
+            }
+            if(i == 4%6)
+            {
+                Materials.push(new THREE.MeshLambertMaterial({color: colorPurple}));
+            }
+            if(i == 5%6)
+            {
+                Materials.push(new THREE.MeshLambertMaterial({color: colorSkyBlue}));
+            }
+            Spheres.push(new THREE.Mesh(Geometries[i], Materials[i]));
+            Spheres[i].position.set(Planets[i].pos.x, Planets[i].pos.y, Planets[i].pos.z);
+            scene.add(Spheres[i]);
+            
+            
+             
+             //itnitialize tails
+            /*
+                PTlineMaterial.push(new THREE.MeshBasicMaterial({
+                    color: 0xff0000
+                }));
+                
+                PTGeo.push(new THREE.Geometry());
+                for(var j = 0; j < MAX_LINE_POINTS; j++)
+                {
+            	    geometry.vertices.push(new THREE.Vector3(Planets[i].pos.x, Planets[i].pos.y, Planets[i].pos.z)); 
+                }
+                
+                PTline.push(new THREE.Line(PTGeo[i], PTlineMaterial[i]));
+                PTline[i].geometry.dynamic = true;
+                scene.add(PTline[i]);
+            */
+      
+        }
+
+            PLM = new THREE.MeshBasicMaterial({
+                color: 0xFFFF00
+            });
+            for(var j = 0; j < np; j++)
+            {
+                PG.push(new THREE.Geometry());
+                for(var i = 0; i < MAX_LINE_POINTS; i++){
+                    PG[j].vertices.push(new THREE.Vector3(Planets[j].pos.x, Planets[j].pos.y, Planets[j].pos.z));
+                }
+            }
+            
+            for(var i = 0; i < np; i++)
+            {
+                if(i == 0%6)
+                {
+                    PL.push(new THREE.Line(PG[i], new THREE.MeshBasicMaterial({color: colorRed})));
+                }
+                if(i == 1%6)
+                {
+                    PL.push(new THREE.Line(PG[i], new THREE.MeshBasicMaterial({color: colorBlue})));
+                }
+                if(i == 2%6)
+                {
+                    PL.push(new THREE.Line(PG[i], new THREE.MeshBasicMaterial({color: colorGreen})));
+                }
+                if(i == 3%6)
+                {
+                    PL.push(new THREE.Line(PG[i], new THREE.MeshBasicMaterial({color: colorYellow})));
+                }
+                if(i == 4%6)
+                {
+                    PL.push(new THREE.Line(PG[i], new THREE.MeshBasicMaterial({color: colorPurple})));
+                }
+                if(i == 5%6)
+                {
+                    PL.push(new THREE.Line(PG[i], new THREE.MeshBasicMaterial({color: colorSkyBlue})));
+                }
+               // PL.push(new THREE.Line(PG[i], PLM));
+                PL[i].geometry.dynamic = true; //geometry might actually be PG[i]
+                scene.add(PL[i]);
+            }
+    }
+///------------------------------
+CM = new Vec;
+    
+        //----------------------------------------------- top
+        // allocating meshs
+        
+        
+       ///-- below is cm and origin 
+        var geometry4 = new THREE.IcosahedronGeometry(.5, 0);
+        var material4 = new THREE.MeshLambertMaterial({color:0xFFFF00});
+        var mesh4 = new THREE.Mesh(geometry4, material4);
+        mesh4.position.set(CM.x, CM.y, CM.z);
+        //mesh4.position.set(0,0,0);
+        
+        var origin = new THREE.BoxGeometry(1,10,10);
+        var material5 = new THREE.MeshLambertMaterial({color:0x666666});
+        var mesh5 = new THREE.Mesh(origin, material5);
+        
+
+
+        
+
+        
+        scene.add(mesh4); //CM
+        //scene.add(mesh5); //origin
+       // scene.add(line);
+      //---------------------------------------------------bottom
+      
+      
+      
+     //keyboard prep  
+     var KeyboardHelper = { left: 37, up: 38, right: 39, down: 40}; //, alt: 18, shift: 1, ctrl: 17};
+    var rightPressed = false;
+    var leftPressed = false;
+    var upPressed = false;
+    var downPressed = false;
+    
+     var aPressed = false;
+    var sPressed = false;
+    var dPressed = false;
+    var wPressed = false;
+    var rPressed = false;
+    var fPressed = false;
+    
+     function keyDownHandler(event) 
+    {
+        if(event.keyCode == 39) {
+            rightPressed = true;
+        }
+        else if(event.keyCode == 37) {
+            leftPressed = true;
+        }
+        if(event.keyCode == 40) {
+        	downPressed = true;
+        }
+        else if(event.keyCode == 38) {
+        	upPressed = true;
+        }
+        
+        if(event.keyCode == 65) {
+            aPressed = true;
+        }
+        else if(event.keyCode == 83) {
+            sPressed = true;
+        }
+        if(event.keyCode == 68) {
+        	dPressed = true;
+        }
+        else if(event.keyCode == 87) {
+        	wPressed = true;
+        }
+        if(event.keyCode == 82) {
+        	rPressed = true;
+        }
+        else if(event.keyCode == 70) {
+        	fPressed = true;
+        }
+        
+        
+    }
+    
+    function keyUpHandler(event) 
+    {
+        if(event.keyCode == 39) {
+            rightPressed = false;
+        }
+        else if(event.keyCode == 37) {
+            leftPressed = false;
+        }
+        if(event.keyCode == 40) {
+        	downPressed = false;
+        }
+        else if(event.keyCode == 38) {
+        	upPressed = false;
+        }
+        
+        if(event.keyCode == 65) {
+            aPressed = false;
+        }
+        else if(event.keyCode == 83) {
+            sPressed = false;
+        }
+        if(event.keyCode == 68) {
+        	dPressed = false;
+        }
+        else if(event.keyCode == 87) {
+        	wPressed = false;
+        }
+        if(event.keyCode == 82) {
+        	rPressed = false;
+        }
+        else if(event.keyCode == 70) {
+        	fPressed = false;
+        }
+    }
+    
+    var theta = 0;
+    var phi = 0;
+    var r  = -100;
+            document.addEventListener('keydown', keyDownHandler, false);
+            document.addEventListener('keyup', keyUpHandler, false);
+            var dx = 0;
+            var dy = 0;
+            var dz = 0;
+            
+            //Save
+            function Save()
+            {
+                for(var i = 0; i < np; i++)
+                {
+                    alert("Planet" + i + ": " + Planets[i].pos.x / 10 + " " + Planets[i].pos.y / 10 + " " + Planets[i].pos.z /10 + " " + Planets[i].vel.x /10 + " " + Planets[i].vel.y /10 + " " + Planets[i].vel.z /10 + " " + Planets[i].m /10);
+                }
+            }
+            //change center
+            var centerBody = -1;
+            function ChangeFocus()
+            {
+                if(np > 0)
+                {
+                    centerBody++;
+                    if(centerBody == np)
+                    {
+                        centerBody = -1;
+                    }
+                    else
+                    {
+                    centerBody = centerBody % np;
+                    }
+                }
+                console.log(centerBody);
+            }
+            //pause function
+            var pause= true;
+            function Pause()
+            {
+                pause = !pause;
+            }
+            function ResetCamera()
+            {
+                //reset Camera
+                camera.position.set(CM.x, CM.y, CM.z + 100);
+                light1.position.set(CM.x, CM.y, CM.z + 100);
+                theta = 0;
+                phi = 0;
+                
+                dx = 0;
+                dy = 0;
+                dz = 0;
+                
+            
+            }
+
+            //most not used;
+            var AD = []; // All directions
+            var Denom = []; //denominators 
+            var Num = [];
+            var AM = []; //accn magnitudes
+            //used
+            var ACCN = []; //vectors
+            var A = []; // list of accn's
+            
+            
+            //CM tail
+            var geometry, line, lineMaterial;
+            lineMaterial = new THREE.MeshBasicMaterial({
+            	color: 0xFFFF00
+            });
+            geometry = new THREE.Geometry();
+            for (i=0; i < MAX_LINE_POINTS; i++){
+            	geometry.vertices.push(new THREE.Vector3(CM.x, CM.y, CM.z));
+            }
+            line = new THREE.Line(geometry, lineMaterial);
+            line.geometry.dynamic = true;
+            scene.add(line);
+            
+            //Planets tail (probably needs to be written in setInitialConditions)
+           
+            
+            
+
+
+            var Pmaterial = new THREE.LineBasicMaterial( { color: 0x0000ff } );
+            var PGeo= [];
+            var tails = [];
+            var PPlanets = [];
+  
+         requestAnimationFrame(render);
+       
+        function render() {
+           
+if(!pause)
+{
+    
+            //lots of math
+            
+            //Center of mass
+            
+            CMp = new Vec;  //previous CM
+            
+            CMp.x = CM.x;
+            CMp.y = CM.y;
+            CMp.z = CM.z;
+            // Center of Mass
+                if(np >= 1)
+                {
+                    var cx = 0;
+                    var cy = 0;
+                    var cz = 0;
+                    var den = 0;
+                        for(var i = 0; i < np; i++)
+                        {
+                            cx += Planets[i].pos.x * Planets[i].m;
+                            cy += Planets[i].pos.y * Planets[i].m;
+                            cz += Planets[i].pos.z * Planets[i].m;
+                            den += Planets[i].m;
+                        }
+                    CM.x = cx / den;
+                    CM.y = cy / den;
+                    CM.z = cz / den;
+                }
+            
+            
+            //calculate accelerations:
+
+            //clear all arrays
+             AD = []; // Accn directions
+             Denom = []; //denominators
+             Num = []; //numerators
+             AM = []; //accn magnitudes
+             ACCN = []; //vectors
+             A = [];
+             //noting previous planet positions
+             PPlanets = [];
+            for(var i = 0; i < np; i++)
+            {
+                PPlanets.push(Planets[i]);
+            }
+
+            // Attempt 3 at ACCN's
+            
+            
+            for(var i = 0; i < np; i++)
+            {
+                for(var j = 0; j < np; j++)
+                {
+                    if(i != j)
+                    {
+                        var den = 0; 
+                        var num = 0;
+                        num = G * Planets[j].m;
+                        
+                        
+                        
+                        var diff = new Vec;
+                        diff.x = Planets[j].pos.x - Planets[i].pos.x;
+                        diff.y = Planets[j].pos.y - Planets[i].pos.y;
+                        diff.z = Planets[j].pos.z - Planets[i].pos.z;
+                        
+                        den = Math.sqrt((diff.x * diff.x) + (diff.y * diff.y) + (diff.z * diff.z));
+                        den = den * den * den;
+                        var mag = num / den;
+                      
+                        A.push(new Vec(mag*diff.x, mag*diff.y, mag*diff.z));
+                        //thus there are np-1 acc'n vectors for each planet;
+                        //one for each planet but that planet itself
+                    }
+                }
+            }
+            
+            for(var i = 0; i < np; i++)
+            {
+                ACCN.push(new Vec);
+                
+                var j = 0;
+                j = i * (np - 1);
+                //counting np-1 accn vectors starting each interval of np-1
+                for(var k = j; k < j + np - 1; k++)
+                {
+                    ACCN[i].x = ACCN[i].x + A[k].x;
+                    ACCN[i].y = ACCN[i].y + A[k].y;
+                    ACCN[i].z = ACCN[i].z + A[k].z;
+                }
+            }
+            
+            
+            
+             // original 3
+            //velocity and position update
+            
+            for(var i = 0; i < np; i++)
+            {
+                //dt = 0.1;
+
+                Planets[i].vel.x = Planets[i].vel.x + ACCN[i].x * dt;
+                Planets[i].vel.y = Planets[i].vel.y + ACCN[i].y * dt;
+                Planets[i].vel.z = Planets[i].vel.z + ACCN[i].z * dt;
+                
+                Planets[i].pos.x = Planets[i].pos.x + Planets[i].vel.x * dt;
+                Planets[i].pos.y = Planets[i].pos.y + Planets[i].vel.y * dt;
+                Planets[i].pos.z = Planets[i].pos.z + Planets[i].vel.z * dt;
+                
+            }
+ 
+            //draw onto canvas:
+            for(var i = 0; i < np; i++)
+            {
+                Spheres[i].position.set(Planets[i].pos.x, Planets[i].pos.y, Planets[i].pos.z);
+            }
+            //draw CM
+            mesh4.position.set(CM.x, CM.y, CM.z);
+           
+           i++;
+           frameCounter = i.toString();
+           document.getElementById("text").value = frameCounter;
+           //console.log(i);
+           
+           //camera stuff
+           if(upPressed) 
+            {
+                //C.z -= 10;
+                //dz -= 10;
+                r += 1;
+                if(centerBody !=-1)
+                {
+                    dz -= 10;
+                }
+            }
+            if(downPressed)
+            {
+               // C.z += 10;
+                //dz += 10;
+                r -= 1;
+                if(centerBody !=-1)
+                {
+                    dz += 10;
+                }
+            }
+            //change speed
+            if(rightPressed)
+            {
+                dt+= .001;
+            }
+            if(leftPressed)
+            {
+                dt-= .001;
+            }
+            //camera focus
+            if(np > 0)
+            {
+                
+                if(centerBody > -1)
+                {
+                    C.x = Planets[centerBody].pos.x + dx;
+                    C.y = Planets[centerBody].pos.y + dy;
+                    C.z = Planets[centerBody].pos.z + 100 + dz;// + dz;
+                }
+                
+                
+            }
+            
+            //camera movement
+            
+            if(np>0 && centerBody == -1)
+            {
+                //var cP = new Vec(Planets[centerBody].pos.x, Planets[centerBody].pos.y, Planets[centerBody].pos.z);
+                //x-y axis
+                /*
+                if(aPressed)
+                {
+                    C.x -= 1;
+                    dx -= 1;
+                }
+                if(dPressed)
+                {
+                    C.x += 1;
+                    dx += 1;
+                }
+                
+                if(sPressed)
+                {
+                    C.y -= 1;
+                    dy -= 1;
+                }
+                if(wPressed)
+                {
+                    C.y += 1;
+                    dy += 1;
+                }
+                
+                if(rPressed)
+                {
+                    C.z += 1;
+                    dz += 1;
+                }
+                if(fPressed)
+                {
+                    C.z -= 1;
+                    dz -=1;
+                }
+                */
+                
+                
+                //try movement along a sphere   
+                
+                if(aPressed)
+                {
+                    phi += 0.01;
+                    
+            console.log("Theta: " + theta);
+            console.log("Phi: " + phi);
+                    
+                }
+                if(dPressed)
+                {
+                    phi -= 0.01;
+                }
+                
+                if(sPressed)
+                {
+                    theta -= 0.01;
+                }
+                if(wPressed)
+                {
+                   theta += 0.01;
+                }
+                /*
+                C.x = r * Math.cos(theta);
+                C.y = r * Math.sin(theta);
+                */
+                
+                C.x = r * Math.cos(theta) * Math.sin(phi);
+                C.y = r * Math.sin(phi) * Math.sin(theta);
+                C.z = r * Math.cos(phi);
+                
+                
+                
+                
+                
+            }
+            if(np > 0 && centerBody > -1)
+            {
+                //camera.lookAt(Planets[centerBody].pos.x, Planets[centerBody].pos.y, Planets[centerBody].pos.z);
+                camera.lookAt(Spheres[centerBody]);
+            }
+            if(np > 0 && centerBody == -1)
+            {
+                //camera.lookAt(CM.x, CM.y, CM.z);
+                camera.lookAt(new THREE.Vector3(CM.x,CM.y,CM.z))
+            }
+            
+            
+            // camera rotation
+            /*
+             i += .01;
+            camera.position.set(1000 * Math.sin(i), 0, 1000 * Math.cos(i));
+            light1.position.set(1000 * Math.sin(i), 0, 1000 * Math.cos(i));
+            camera.rotation.y += .01;
+            */
+           
+           if(centerBody == -1)
+           {
+               if(theta == 0 && phi == 0)
+               {
+                   
+                    //camera follows CM:
+                    if(cmf % 2 == 1)
+                    {
+                        C.x = CM.x;
+                        C.y = CM.y;
+                        C.z = CM.z + dz + 100;
+                    }
+                    
+               }
+           }
+           //cm tail:
+            
+            // shift the array
+            line.geometry.vertices.push(line.geometry.vertices.shift());
+            // add the point to the end of the array
+            line.geometry.vertices[100000-1] = new THREE.Vector3(CM.x, CM.y, CM.z);
+            line.geometry.verticesNeedUpdate = true;
+            
+            for(var i = 0; i < np; i++)
+            {
+                PL[i].geometry.vertices.push(PL[i].geometry.vertices.shift());
+                PL[i].geometry.vertices[100000-1] = new THREE.Vector3(Planets[i].pos.x, Planets[i].pos.y, Planets[i].pos.z);
+                PL[i].geometry.verticesNeedUpdate = true;
+            }
+            
+            if(frameCounter < 4)
+            {
+                C.x = CM.x;
+                C.y = CM.y;
+                C.z = CM.z + dz + 100;
+            }
+            //Planets tail:
+            
+            
+            tails = [];
+            PGeo = [];
+            
+                       
+        camera.position.set(C.x, C.y, C.z);
+        light1.position.set(C.x, C.y, C.z);
+           
+}//end of if !pause
+        renderer.render(scene, camera);
+        requestAnimationFrame(render);
+
+        }
+
+</script>
+</body>
+</html>
