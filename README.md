@@ -3,7 +3,7 @@ A real-time interactive **N-body gravitational simulation** implemented in JavaS
 
 I made this iterator back around 2018 under the guidance of Dr. Taicheng Ouyang, who had asked me to create a html/js version of a previously existing java iterator. Though I was able to directly translate some features into javascript, I ended up needing to write many parts from scratch to attain the same features as the java version. I decided to finally get my code public again after many years, hence the outdated three.js version. 
 
----
+
 ## How to Use:
 Here is a sample initial condition (from Ouyang's research)
 0.01 100
@@ -23,17 +23,15 @@ which represents a 3d position, a 3d vector (velocity), and finally the mass of 
 
 
 
----
 
-## 🌌 Overview
+## Overview
 
-This project simulates the gravitational interaction of **N bodies** in three-dimensional space using classical Newtonian physics. Each body interacts with every other body via pairwise gravitational forces.
+This short project simulates only gravitational interactions between bodies; no other forces are included. This was mant for the purpose of testing orbits for stability in 2018, so it is a bit old, hence some of the old js libraries. I may update for smoother run time, prettier graphics, additional functions in the future, but I mainly wanted to save my work onto something accessible for now.
 
-The system evolves over time using a numerical integration approach (explicit Euler method).
 
----
 
-## ⚙️ Physics Model
+
+## Physics Model
 
 The simulation is based entirely on Newtonian gravity:
 
@@ -41,15 +39,7 @@ The simulation is based entirely on Newtonian gravity:
 F = G \frac{m_1 m_2}{r^2}
 \]
 
-Each body experiences the net gravitational force from all other bodies in the system.
-
-No relativistic effects, dark matter models, or cosmological expansion terms are included.
-
----
-
-## 🧮 Numerical Method
-
-The system is solved using **explicit Euler integration**:
+Each body interacts with each other body pair-wise. The system is solved using explicit Euler integration:
 
 - Velocity update:  
   v(t + dt) = v(t) + a(t) · dt
@@ -57,37 +47,37 @@ The system is solved using **explicit Euler integration**:
 - Position update:  
   x(t + dt) = x(t) + v(t) · dt
 
----
 
-## 🧪 Features
+
+## Current Features
 
 - N-body gravitational simulation (any number of bodies)
 - Real-time 3D rendering using Three.js
 - Adjustable initial conditions via input field
-- Camera controls (free movement + focus modes)
+- Camera controls (very janky right now)
 - Center-of-mass tracking
 - Trajectory visualization
 
----
 
-## 🎮 Controls
+
+## Controls
 
 - Arrow keys:
   - ↑ / ↓ : zoom in/out
   - ← / → : adjust simulation speed
 
 - WASD:
-  - camera movement (free mode)
+  - camera movement (good luck)
 
 - Buttons:
   - Start/Pause simulation
   - Change focus object
   - Reset camera
-  - Save system state
+  - Save system state - outputs a copy/paste-able list of current masses, positions and velocity.
 
----
 
-## 🧠 Notes
+
+## Notes
 
 - Pure Newtonian gravity only
 - Deterministic chaotic system (sensitive to initial conditions)
