@@ -14,10 +14,15 @@ Here is a sample initial condition (from Ouyang's research)
 initial coditions follow this template:
 
 Header:
+
 dt g   
-this is step size and strength of gravity. Default is .01 and 100
+
+(this is step size and strength of gravity. Default is .01 and 100)
+
 Each body gets a row of 7 values:
+
 x y z vx vy vz m
+
 which represents a 3d position, a 3d vector (velocity), and finally the mass of the body.
 
 
