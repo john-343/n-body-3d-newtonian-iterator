@@ -28,10 +28,15 @@
     <button onclick="ChangeFocus()">Change Focus</button>
     <button onclick="ResetCamera()">Reset Camera</button>
     <button onclick="Save()">Save</button>
+	<button onclick="Body_POV()">Body POV</button>
     
     <br>
-    
-    Frame:(bugged) <input type="text" id="text">
+    Info for nerds:
+    Simulation Time (t): <span id="text">0.00</span>
+    Step (dt): <span id="text_dt">0.00</span>
+	Total Energy: <span id="total_e">0.00</span>, (Kinetic: <span id="kin_e">0.00</span> ), (Gravtational Potential: <span id="grav_e">0.00</span> )
+
+	
     Controls: up arrow key: zoom in; down arroy key: zoom out; left arrow key: slow down; right arrow key: speed up;
     <br>
     Camera Controls: "w", "a", "s", "d" to move camera
@@ -41,8 +46,10 @@
     
 <script>
 
-//ideas: add reverse time feature
+
+
 var frameCounter = "0";
+var simTime = 0;
 var MAX_LINE_POINTS = 100000;
 
 var PLM;
@@ -130,6 +137,21 @@ var dt = .01;
 var i = 0;
 var G = 10000;
 var np = 0;
+
+
+// energy tracker (begin work on 4/26 2026
+var total_e = 0.0;
+var grav_e = 0.0;
+var kin_e = 0.0;
+
+var pov_toggle = 0
+
+function Body_POV() {
+
+	pov_toggle++;
+	pov_toggle = pov_toggle % 2;
+
+}
 
 //hard-coded inits below *trying to get rid of these)
 
@@ -485,6 +507,16 @@ CM = new Vec;
             var centerBody = -1;
             function ChangeFocus()
             {
+/*				if (np === 0) return;
+				centerBody = (centerBody + 1) % np;
+
+				// reset camera offsets so focus feels stable
+				dx = 0;
+				dy = 0;
+				dz = 0;
+
+				console.log("Focusing body:", centerBody);
+*/
                 if(np > 0)
                 {
                     centerBody++;
@@ -498,6 +530,7 @@ CM = new Vec;
                     }
                 }
                 console.log(centerBody);
+
             }
             //pause function
             var pause= true;
@@ -556,12 +589,67 @@ CM = new Vec;
   
          requestAnimationFrame(render);
 
+// default to stable 3 body system
 var defaultInits =
 "0.01 100 " +
 "5.8166 0 0 0.0001 0.3803 0.0000 10.0000 " +
 "-9.5168 0.0008 -0.1376 0.1547 -0.8752 0.2103 5.0000 " +
 "-10.5825 -0.0041 0.6879 -0.7740 0.5729 -1.0517 1.0000";
 SetInitialConditions(defaultInits);       
+
+
+
+function update_energy() {
+	
+	kin_e = 0;
+	grav_e = 0;
+	total_e = 0;
+	
+	for(var i = 0; i < np; i++)
+            {
+				
+				//kinetic = (1/2) m v^2. 
+				
+				kin_e += .5 * Planets[i].m * (Planets[i].vel.x * Planets[i].vel.x + Planets[i].vel.y * Planets[i].vel.y + Planets[i].vel.z * Planets[i].vel.z);
+				
+				
+				
+                for(var j = i+1; j < np; j++)
+                {
+
+					//gravitational potential energy
+
+                        var den_r = 0; 
+                        var num = 0;
+                        //num = G * Planets[j].m;
+                        
+                        
+                        
+                        var diff = new Vec;
+                        diff.x = Planets[j].pos.x - Planets[i].pos.x;
+                        diff.y = Planets[j].pos.y - Planets[i].pos.y;
+                        diff.z = Planets[j].pos.z - Planets[i].pos.z;
+
+						
+                        
+                        den_r = Math.sqrt((diff.x * diff.x) + (diff.y * diff.y) + (diff.z * diff.z));
+			
+						grav_e += -G * Planets[i].m * Planets[j].m / den_r;
+						
+						
+                        //den = den * den * den;
+                        //var mag = num / den;
+                      
+                        //A.push(new Vec(mag*diff.x, mag*diff.y, mag*diff.z));
+                        //thus there are np-1 acc'n vectors for each planet;
+                        //one for each planet but that planet itself
+                    }
+
+                }
+	total_e = kin_e + grav_e;
+            
+
+}
 
 
         function render() {
@@ -689,7 +777,7 @@ if(!pause)
            
            i++;
            frameCounter = i.toString();
-           document.getElementById("text").value = frameCounter;
+           //document.getElementById("text").value = frameCounter;
            //console.log(i);
            
            //camera stuff
@@ -821,8 +909,8 @@ if(!pause)
             }
             if(np > 0 && centerBody > -1)
             {
-                //camera.lookAt(Planets[centerBody].pos.x, Planets[centerBody].pos.y, Planets[centerBody].pos.z);
-                camera.lookAt(Spheres[centerBody]);
+                camera.lookAt(Planets[centerBody].pos.x, Planets[centerBody].pos.y, Planets[centerBody].pos.z);
+                //camera.lookAt(Spheres[centerBody]);
             }
             if(np > 0 && centerBody == -1)
             {
@@ -882,12 +970,35 @@ if(!pause)
             tails = [];
             PGeo = [];
             
+		if(pov_toggle == 1 && centerBody != -1)
+		{
+			C.x = Planets[centerBody].pos.x;
+			C.y = Planets[centerBody].pos.y;
+			C.z = Planets[centerBody].pos.z;
+            //camera.lookAt(Planets[1].pos.x, Planets[1].pos.y, Planets[1].pos.z);
+			camera.lookAt(CM.x, CM.y, CM.z);
+
+		}
                        
         camera.position.set(C.x, C.y, C.z);
         light1.position.set(C.x, C.y, C.z);
+		
+		//track simulated time (accounts for slow motion - sclaes with dt)
+		simTime += dt;
            
 }//end of if !pause
-        renderer.render(scene, camera);
+
+
+
+
+		document.getElementById("text").textContent = simTime.toFixed(2);
+		document.getElementById("text_dt").textContent = dt.toFixed(2);
+		update_energy();
+		document.getElementById("total_e").textContent = total_e.toFixed(4);
+		document.getElementById("kin_e").textContent = kin_e.toFixed(4);
+		document.getElementById("grav_e").textContent = grav_e.toFixed(4);
+		
+		renderer.render(scene, camera);
         requestAnimationFrame(render);
 
         }
